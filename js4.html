@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pretty Places Map</title>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Comic Neue', cursive;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff0f5;
+            min-height: 100vh;
+            padding: 20px;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M30,10 Q50,5 70,10 Q95,15 90,40 Q85,65 50,90 Q15,65 10,40 Q5,15 30,10 Z" fill="none" stroke="%23ffb6c1" stroke-width="0.5"/></svg>');
+            background-size: 200px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #d14d8b;
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.8);
+            position: relative;
+            display: inline-block;
+        }
+
+        h1:after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background-image: url('data:image/svg+xml;utf8,<svg width="20" height="10" viewBox="0 0 20 10" xmlns="http://www.w3.org/2000/svg"><path d="M0,5 Q5,0 10,5 T20,5" fill="none" stroke="%23ff69b4" stroke-width="2"/></svg>');
+            background-repeat: repeat-x;
+        }
+
+        #container {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0px 8px 16px rgba(255, 105, 180, 0.2);
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            border: 3px solid #ffb6c1;
+            background-color: #fff9fa;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #container:before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffb6c1;
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        #container:after {
+            content: "";
+            position: absolute;
+            bottom: -15px;
+            left: -15px;
+            width: 70px;
+            height: 70px;
+            background-color: #ffd1dc;
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ffb6c1;
+            border-radius: 30px;
+            font-size: 16px;
+            background-color: #fff9fa;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            border-color: #d14d8b;
+            box-shadow: 0 0 0 3px rgba(255, 182, 193, 0.5);
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #ff69b4;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 0 #d14d8b;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background-color: #ff1493;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #d14d8b;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #d14d8b;
+        }
+
+        button:after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: rgba(255,255,255,0.1);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        button:hover:after {
+            animation: sparkle 1.5s infinite;
+        }
+
+        @keyframes sparkle {
+            0% { transform: rotate(30deg) translate(-30%, -30%); }
+            100% { transform: rotate(30deg) translate(30%, 30%); }
+        }
+
+        #locationsList {
+            list-style: none;
+            padding: 0;
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            text-align: left;
+            scrollbar-width: thin;
+            scrollbar-color: #ffb6c1 #fff0f5;
+        }
+
+        #locationsList::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #locationsList::-webkit-scrollbar-track {
+            background: #fff0f5;
+            border-radius: 10px;
+        }
+
+        #locationsList::-webkit-scrollbar-thumb {
+            background-color: #ffb6c1;
+            border-radius: 10px;
+        }
+
+        #locationsList li {
+            background: #fff;
+            margin: 8px 0;
+            padding: 12px 15px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0px 3px 6px rgba(255, 182, 193, 0.3);
+            border-left: 5px solid #ff69b4;
+            transition: all 0.3s;
+            position: relative;
+            padding-left: 45px;
+        }
+
+        #locationsList li:before {
+            content: "📍";
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+        }
+
+        #locationsList li:hover {
+            background: #ffe6ee;
+            transform: translateX(5px);
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 15px;
+            margin-top: 20px;
+            border: 3px solid #ffb6c1;
+            box-shadow: inset 0 0 10px rgba(255, 105, 180, 0.2);
+            overflow: hidden;
+        }
+
+        .leaflet-marker-icon {
+            filter: drop-shadow(0 0 4px rgba(209, 77, 139, 0.6));
+        }
+
+        .leaflet-popup-content {
+            font-family: 'Comic Neue', cursive;
+            color: #d14d8b;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 15px !important;
+            border: 2px solid #ffb6c1 !important;
+        }
+
+        .leaflet-popup-tip {
+            background: #ffb6c1 !important;
+        }
+
+        .heart-marker {
+            background-color: #ff69b4;
+            width: 20px;
+            height: 20px;
+            display: block;
+            transform: rotate(-45deg);
+            position: relative;
+        }
+
+        .heart-marker:before,
+        .heart-marker:after {
+            content: "";
+            background-color: #ff69b4;
+            border-radius: 50%;
+            height: 20px;
+            position: absolute;
+            width: 20px;
+        }
+
+        .heart-marker:before {
+            top: -10px;
+            left: 0;
+        }
+
+        .heart-marker:after {
+            left: 10px;
+            top: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🌸 Pretty Places Map 🌸</h1>
+    <div id="container">
+        <div id="controls">
+            <input type="text" id="locationInput" placeholder="Where would you like to go?">
+            <button id="addLocationButton">Add Location</button>
+        </div>
+        
+        <ul id="locationsList"></ul>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const locationInput = document.getElementById("locationInput"); 
+        const addLocationButton = document.getElementById("addLocationButton");
+        const locationsList = document.getElementById("locationsList");
+
+        let locationsArray = [];
+        let map, markerLayer;
+
+        function initMap() {
+            map = L.map("map").setView([12.8797, 121.7740], 5); // Centered on the Philippines
+            
+            // Use a cute pinkish map tile
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "© OpenStreetMap contributors",
+            }).addTo(map);
+            
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        addLocationButton.addEventListener("click", () => {
+            const location = locationInput.value.trim();
+            if (location !== "") {
+                locationsArray.push(location);
+                locationInput.value = "";
+                updateLocationsList();
+                updateMap(location);
+            }
+        });
+
+        function updateLocationsList() {
+            locationsList.innerHTML = "";
+            locationsArray.forEach((location) => {
+                const li = document.createElement("li");
+                li.textContent = location;
+                li.addEventListener("click", () => updateMap(location));
+                locationsList.appendChild(li);
+            });
+        }
+
+        function updateMap(location) {
+            const coordinates = getCoordinatesForLocation(location);
+            if (coordinates) {
+                map.setView(coordinates, 6);
+                markerLayer.clearLayers();
+                
+                // Create a custom heart marker
+                const heartIcon = L.divIcon({
+                    html: '<div class="heart-marker"></div>',
+                    iconSize: [20, 20],
+                    className: 'heart-icon'
+                });
+                
+                L.marker(coordinates, {icon: heartIcon})
+                    .addTo(markerLayer)
+                    .bindPopup(`<div style="text-align:center;">✨ ${location} ✨</div>`)
+                    .openPopup();
+            } else {
+                alert("Oopsie! We couldn't find that location. Try another pretty place!");
+            }
+        }
+
+        function getCoordinatesForLocation(location) {
+            const locationCoordinates = {
+                "philippines": [12.8797, 121.7740],
+                "taiwan": [23.6978, 120.9605],
+                "manila": [14.5995, 120.9842],
+                "iloilo": [10.7202, 122.5621],
+                "tokyo": [35.6762, 139.6503],
+                "paris": [48.8566, 2.3522],
+                "new york": [40.7128, -74.0060],
+                "bali": [-8.4095, 115.1889],
+                "seoul": [37.5665, 126.9780],
+                "sydney": [-33.8688, 151.2093],
+                "pototan": [10.9499962, 122.6333308]
+            };
+            return locationCoordinates[location.toLowerCase()];
+        }
+
+        initMap();
+    </script>
+
+</body>
+</html>

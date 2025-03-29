@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌸 Pretty Places Explorer 🌸</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Font Awesome for cute icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&family=Fredoka+One&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="container">
+        <h2>🌸 Pretty Places Explorer 🌸</h2>
+        
+        <div class="input-group">
+            <input type="text" id="locationInput" placeholder="Where would you like to go? ✨">
+            <button id="addLocationButton"><i class="fas fa-map-marker-alt"></i> Add Location</button>
+        </div>
+        
+        <ul id="locationsList"></ul>
+        <div id="map"></div>
+    </div>
+    
+    <div class="floating-hearts" id="floatingHearts"></div>
+
+    <script>
+        const locationInput = document.getElementById("locationInput");
+        const addLocationButton = document.getElementById("addLocationButton");
+        const locationsList = document.getElementById("locationsList");
+        const floatingHearts = document.getElementById("floatingHearts");
+
+        let locationsArray = [];
+        let map = L.map("map").setView([20, 0], 2);
+        let markersGroup = L.layerGroup().addTo(map);
+
+        // Use a cute pinkish map tile
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Made with 💖'
+        }).addTo(map);
+
+        // Create floating hearts
+        function createFloatingHearts() {
+            for (let i = 0; i < 10; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement("div");
+                    heart.classList.add("heart");
+                    heart.innerHTML = "❤";
+                    heart.style.left = Math.random() * 100 + "%";
+                    heart.style.top = Math.random() * 100 + "%";
+                    heart.style.animationDuration = 4 + Math.random() * 6 + "s";
+                    heart.style.fontSize = 10 + Math.random() * 20 + "px";
+                    floatingHearts.appendChild(heart);
+                    
+                    // Remove heart after animation
+                    setTimeout(() => {
+                        heart.remove();
+                    }, 10000);
+                }, i * 1000);
+            }
+        }
+        
+        // Create confetti effect
+        function createConfetti() {
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement("div");
+                    confetti.classList.add("confetti");
+                    confetti.style.left = Math.random() * 100 + "vw";
+                    confetti.style.backgroundColor = `hsl(${Math.random() * 60 + 320}, 100%, ${Math.random() * 30 + 60}%)`;
+                    confetti.style.width = 5 + Math.random() * 10 + "px";
+                    confetti.style.height = 5 + Math.random() * 10 + "px";
+                    document.body.appendChild(confetti);
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 2000);
+                }, i * 50);
+            }
+        }
+
+        addLocationButton.addEventListener("click", addLocation);
+        
+        // Also allow adding locations with Enter key
+        locationInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                addLocation();
+            }
+        });
+
+        function addLocation() {
+            const location = locationInput.value.trim();
+            if (location === "") {
+                // Playful shake animation if input is empty
+                locationInput.style.animation = "none";
+                void locationInput.offsetWidth; // Trigger reflow
+                locationInput.style.animation = "shake 0.5s";
+                return;
+            }
+
+            locationsArray.push(location);
+            locationInput.value = "";
+            updateLocationsList();
+            geocodeLocation(location);
+            
+            // Create confetti effect when adding a location
+            createConfetti();
+        }
+
+        function updateLocationsList() {
+            locationsList.innerHTML = "";
+            locationsArray.forEach((location, index) => {
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    ${location}
+                    <span class="delete-btn" data-index="${index}">×</span>
+                `;
+                
+                // Click to view location
+                li.addEventListener("click", () => {
+                    geocodeLocation(location, true);
+                });
+                
+                // Delete button
+                const deleteBtn = li.querySelector(".delete-btn");
+                deleteBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    locationsArray.splice(index, 1);
+                    updateLocationsList();
+                    
+                    // If no locations left, reset map view
+                    if (locationsArray.length === 0) {
+                        markersGroup.clearLayers();
+                        map.setView([20, 0], 2);
+                    }
+                });
+                
+                locationsList.appendChild(li);
+            });
+        }
+
+        function geocodeLocation(location, flyTo = false) {
+            const apiUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        const displayName = data[0].display_name.split(",")[0];
+
+                        addMarker(lat, lon, displayName, flyTo);
+                    } else {
+                        showError("Oopsie! We couldn't find that pretty place. Try another one!");
+                    }
+                })
+                .catch(() => showError("Oh no! There was a problem searching for this location."));
+        }
+
+        function addMarker(lat, lon, location, flyTo = false) {
+            // Create custom heart marker
+            const heartIcon = L.divIcon({
+                html: '<div class="heart-marker"></div>',
+                iconSize: [24, 24],
+                className: 'heart-icon'
+            });
+            
+            markersGroup.clearLayers();
+            L.marker([lat, lon], {icon: heartIcon})
+                .addTo(markersGroup)
+                .bindPopup(`<div style="text-align:center;"><i class="fas fa-heart" style="color:${getRandomPink()}"></i> ${location} <i class="fas fa-heart" style="color:${getRandomPink()}"></i></div>`)
+                .openPopup();
+            
+            if (flyTo) {
+                map.flyTo([lat, lon], 12, {
+                    duration: 1.5,
+                    easeLinearity: 0.25
+                });
+            } else {
+                map.setView([lat, lon], 12);
+            }
+        }
+        
+        function getRandomPink() {
+            const pinks = ["#ff6b9d", "#ff9ec6", "#e84393", "#ff6b8b", "#ff8fab"];
+            return pinks[Math.floor(Math.random() * pinks.length)];
+        }
+        
+        function showError(message) {
+            const errorDiv = document.createElement("div");
+            errorDiv.style.position = "fixed";
+            errorDiv.style.bottom = "20px";
+            errorDiv.style.left = "50%";
+            errorDiv.style.transform = "translateX(-50%)";
+            errorDiv.style.backgroundColor = "var(--pink-darker)";
+            errorDiv.style.color = "white";
+            errorDiv.style.padding = "15px 25px";
+            errorDiv.style.borderRadius = "50px";
+            errorDiv.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
+            errorDiv.style.zIndex = "1000";
+            errorDiv.style.animation = "fadeIn 0.3s";
+            errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.style.animation = "fadeOut 0.3s";
+                setTimeout(() => errorDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // Start floating hearts animation
+        createFloatingHearts();
+        setInterval(createFloatingHearts, 10000);
+    </script>
+</body>
+</html>
